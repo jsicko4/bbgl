@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bogeys & Brews - Golf League Optimizer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6 font-sans">
+  <div class="max-w-7xl mx-auto space-y-6">
+    
+    <!-- Header -->
+    <header class="flex justify-between items-center border-b border-slate-700 pb-4">
+      <div>
+        <h1 class="text-2xl font-bold text-emerald-400">Bogeys and Brews Golf League</h1>
+        <p class="text-sm text-slate-400">0-100 Skill Scaling & Monte Carlo Team Optimizer</p>
+      </div>
+      <div id="fileStatus" class="text-xs bg-slate-800 text-slate-400 px-3 py-1.5 rounded-md border border-slate-700">
+        No spreadsheet loaded
+      </div>
+    </header>
+
+    <!-- Upload & Controls Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      
+      <!-- Upload Card -->
+      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-3">
+        <h2 class="font-semibold text-slate-200">1. Upload League Workbook</h2>
+        <input type="file" id="excelFile" accept=".xlsx, .xls" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 cursor-pointer"/>
+        <p class="text-xs text-slate-500">Requires "League Data" sheet. Optional "Matchup History" sheet.</p>
+      </div>
+
+      <!-- Settings Card -->
+      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-3">
+        <h2 class="font-semibold text-slate-200">2. Team Settings</h2>
+        <div class="flex items-center space-x-4">
+          <label class="text-sm text-slate-300">Target Team Size:</label>
+          <select id="teamSize" class="bg-slate-700 text-white rounded-lg px-3 py-1.5 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <option value="2">2 Players (Pairs)</option>
+            <option value="3">3 Players</option>
+            <option value="4">4 Players (Foursomes)</option>
+          </select>
+        </div>
+        <p class="text-xs text-slate-500">Includes score-range performance points & 1.5x recency weighting.</p>
+      </div>
+
+      <!-- Action Card -->
+      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-3 flex flex-col justify-between">
+        <h2 class="font-semibold text-slate-200">3. Generate Matchups</h2>
+        <button id="generateBtn" disabled onclick="generateTeams()" class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-2.5 rounded-lg transition-all">
+          Generate Fair Teams
+        </button>
+      </div>
+    </div>
+
+    <!-- Live Weights Control Panel -->
+    <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+        <h2 class="font-semibold text-slate-200">4. Live Algorithm Weights</h2>
+        <button onclick="resetWeights()" class="text-xs text-emerald-400 hover:text-emerald-300 transition-colors">Reset Defaults</button>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6" id="slidersContainer">
+        <!-- Sliders -->
+        <div class="space-y-1"><label class="flex justify-between text-xs text-slate-400"><span>Score Points</span><span id="val-scorePts" class="text-white font-mono">1.0</span></label><input type="range" id="weight-scorePts" min="0" max="3" step="0.1" value="1.0" oninput="updateWeights()" class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-emerald-500"></div>
+        <div class="space-y-1"><label class="flex justify-between text-xs text-slate-400"><span>Recent Weekly Avg</span><span id="val-weekly" class="text-white font-mono">1.0</span></label><input type="range" id="weight-weekly" min="0" max="3" step="0.1" value="1.0" oninput="updateWeights()" class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-emerald-500"></div>
+        <div class="space-y-1"><label class="flex justify-between text-xs text-slate-400"><span>Handicap</span><span id="val-hcp" class="text-white font-mono">1.0</span></label><input type="range" id="weight-hcp" min="0" max="3" step="0.1" value="1.0" oninput="updateWeights()" class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-emerald-500"></div>
+        <div class="space-y-1"><label class="flex justify-between text-xs text-slate-400"><span>Historical Avg</span><span id="val-avg" class="text-white font-mono">1.0</span></label><input type="range" id="weight-avg" min="0" max="3" step="0.1" value="1.0" oninput="updateWeights()" class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-emerald-500"></div>
+        <div class="space-y-1"><label class="flex justify-between text-xs text-slate-400"><span>Skins Won</span><span id="val-skins" class="text-white font-mono">1.0</span></label><input type="range" id="weight-skins" min="0" max="3" step="0.1" value="1.0" oninput="updateWeights()" class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-emerald-500"></div>
+        <div class="space-y-1"><label class="flex justify-between text-xs text-slate-400"><span>Winnings ($)</span><span id="val-winnings" class="text-white font-mono">1.0</span></label><input type="range" id="weight-winnings" min="0" max="3" step="0.1" value="1.0" oninput="updateWeights()" class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-emerald-500"></div>
+        <div class="space-y-1"><label class="flex justify-between text-xs text-slate-400"><span>Pins</span><span id="val-pins" class="text-white font-mono">1.0</span></label><input type="range" id="weight-pins" min="0" max="3" step="0.1" value="1.0" oninput="updateWeights()" class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-emerald-500"></div>
+        <div class="space-y-1"><label class="flex justify-between text-xs text-slate-400"><span>Putts</span><span id="val-putt" class="text-white font-mono">0.5</span></label><input type="range" id="weight-putt" min="0" max="3" step="0.1" value="0.5" oninput="updateWeights()" class="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-emerald-500"></div>
+      </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- Player Selection & Rankings (2 cols) -->
+      <div class="lg:col-span-2 bg-slate-800 rounded-xl border border-slate-700 p-5 space-y-4">
+        <div class="flex justify-between items-center">
+          <h2 class="font-semibold text-slate-200">Active Roster & 0-100 Skill Rankings</h2>
+          <div class="space-x-2 text-xs">
+            <button onclick="toggleAll(true)" class="text-emerald-400 hover:underline">Select All</button>
+            <span class="text-slate-600">|</span>
+            <button onclick="toggleAll(false)" class="text-emerald-400 hover:underline">Deselect All</button>
+          </div>
+        </div>
+        
+        <div class="overflow-x-auto max-h-[500px]">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/50 sticky top-0 text-slate-400 border-b border-slate-700">
+              <tr>
+                <th class="p-2">Play</th>
+                <th class="p-2">Player</th>
+                <th class="p-2">Composite Skill</th>
+                <th class="p-2">Score Pts</th>
+                <th class="p-2">Avg Score</th>
+                <th class="p-2">Handicap</th>
+                <th class="p-2">Skins</th>
+                <th class="p-2">Winnings</th>
+              </tr>
+            </thead>
+            <tbody id="playerTableBody" class="divide-y divide-slate-700/50">
+              <tr>
+                <td colspan="8" class="p-4 text-center text-slate-500">Awaiting live spreadsheet data upload.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Generated Teams Display (1 col) -->
+      <div class="bg-slate-800 rounded-xl border border-slate-700 p-5 space-y-4">
+        <h2 class="font-semibold text-slate-200">Optimized Weekly Teams</h2>
+        <div id="teamsContainer" class="space-y-3 overflow-y-auto max-h-[500px]">
+          <div class="p-4 bg-slate-900/30 rounded-lg text-center text-xs text-slate-500 border border-dashed border-slate-700">
+            Teams will display here after clicking "Generate Fair Teams".
+          </div>
+        </div>
+
+        <!-- Shareable Card Box -->
+        <div id="shareCardSection" class="hidden border-t border-slate-700 pt-4 space-y-2">
+          <div class="flex justify-between items-center">
+            <h3 class="text-xs font-semibold text-slate-300">Shareable Matchup Text</h3>
+            <button id="copyBtn" onclick="copyShareableText()" class="text-xs bg-emerald-700 hover:bg-emerald-600 text-white font-medium px-3 py-1 rounded transition-all">
+              Copy Matchups
+            </button>
+          </div>
+          <textarea id="shareableText" readonly class="w-full h-36 bg-slate-900 text-slate-300 text-xs font-mono p-2.5 rounded-lg border border-slate-700 focus:outline-none resize-none"></textarea>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let playersData = [];
+    let matchupHistory = [];
+
+    // Points Assignment
+    function getPointsFromScore(score) {
+      if (isNaN(score) || score <= 0) return 0;
+      if (score < 36) return 10;
+      if (score <= 39) return 8;
+      if (score <= 43) return 6;
+      if (score <= 47) return 4;
+      if (score <= 51) return 2;
+      return 1;
+    }
+
+    // Weight Slider Functions
+    function updateWeights() {
+      const metrics = ['scorePts', 'weekly', 'hcp', 'avg', 'skins', 'winnings', 'pins', 'putt'];
+      metrics.forEach(m => {
+        let val = parseFloat(document.getElementById(`weight-${m}`).value).toFixed(1);
+        document.getElementById(`val-${m}`).innerText = val;
+      });
+
+      if (playersData.length > 0) {
+        calculateSkillScores(playersData);
+        renderPlayerTable();
+      }
+    }
+
+    function resetWeights() {
+      const defaults = { scorePts: 1.0, weekly: 1.0, hcp: 1.0, avg: 1.0, skins: 1.0, winnings: 1.0, pins: 1.0, putt: 0.5 };
+      for (const [key, value] of Object.entries(defaults)) {
+        document.getElementById(`weight-${key}`).value = value;
+      }
+      updateWeights();
+    }
+
+    document.getElementById('excelFile').addEventListener('change', handleFileUpload);
+
+    function handleFileUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        const mainSheet = workbook.Sheets["League Data"] || workbook.Sheets[workbook.SheetNames[0]];
+        const rawJson = XLSX.utils.sheet_to_json(mainSheet, { header: 1 });
+
+        if (workbook.Sheets["Matchup History"]) {
+          matchupHistory = XLSX.utils.sheet_to_json(workbook.Sheets["Matchup History"]);
+        }
+
+        processPlayerData(rawJson);
+        document.getElementById('fileStatus').innerText = `Loaded: ${file.name}`;
+        document.getElementById('generateBtn').disabled = false;
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function processPlayerData(rows) {
+      let headerIdx = rows.findIndex(r => Array.isArray(r) && r.some(cell => String(cell).toLowerCase().includes('name')));
+      if (headerIdx === -1) return alert('Could not find "Name" header in sheet.');
+
+      const headers = rows[headerIdx].map(h => String(h || ''));
+
+      const findColIdx = (terms, fallback) => {
+        const idx = headers.findIndex(h => {
+          const clean = h.toLowerCase().replace(/[^a-z]/g, '');
+          return terms.some(term => clean.includes(term));
+        });
+        return idx !== -1 ? idx : fallback;
+      };
+
+      const nameCol = findColIdx(['name'], 0);
+      const skinsCol = findColIdx(['skin'], 1);
+      const puttCol = findColIdx(['putt'], 2);
+      const pinsCol = findColIdx(['pin'], 3);
+      const winningsCol = findColIdx(['winning'], 5);
+      const avgCol = findColIdx(['average', 'avg'], 6);
+      const hcpCol = findColIdx(['handicap', 'hcp'], 7);
+
+      const weeklyStartCol = hcpCol + 2;
+
+      const dataRows = rows.slice(headerIdx + 1).filter(r => r && r[nameCol] && String(r[nameCol]).trim() !== '' && String(r[nameCol]) !== '#CALC!');
+
+      const parsed = dataRows.map(r => {
+        const cleanNum = (val) => {
+          if (val === undefined || val === null) return NaN;
+          const cleaned = String(val).replace(/[\$,]/g, '').trim();
+          return parseFloat(cleaned);
+        };
+
+        const name = String(r[nameCol]).trim();
+        const skins = cleanNum(r[skinsCol]) || 0;
+        const putt = cleanNum(r[puttCol]) || 0;
+        const pins = cleanNum(r[pinsCol]) || 0;
+        const winnings = cleanNum(r[winningsCol]) || 0;
+        
+        let avg = cleanNum(r[avgCol]);
+        let hcp = cleanNum(r[hcpCol]);
+
+        const weeklyScores = r.slice(weeklyStartCol)
+          .map(v => cleanNum(v))
+          .filter(v => !isNaN(v));
+
+        let weeklyAvg = avg;
+        let scorePoints = 0;
+
+        if (weeklyScores.length > 0) {
+          const totalWeeks = weeklyScores.length;
+          let weightedSum = 0;
+          let totalWeight = 0;
+
+          weeklyScores.forEach((score, idx) => {
+            const isLastTwo = idx >= totalWeeks - 2;
+            const weight = isLastTwo ? 1.5 : 1.0;
+            weightedSum += score * weight;
+            totalWeight += weight;
+            scorePoints += getPointsFromScore(score);
+          });
+
+          weeklyAvg = weightedSum / totalWeight;
+        } else if (!isNaN(avg) && avg > 0) {
+          scorePoints = getPointsFromScore(avg);
+        }
+
+        if (isNaN(avg)) avg = weeklyAvg || 0;
+        if (isNaN(hcp)) hcp = 0;
+
+        return { 
+          name, 
+          skins, 
+          putt, 
+          pins, 
+          winnings, 
+          scorePoints,
+          avg: Math.round(avg * 10) / 10, 
+          hcp: Math.round(hcp * 10) / 10, 
+          weeklyAvg, 
+          active: true 
+        };
+      });
+
+      playersData = parsed;
+      calculateSkillScores(playersData);
+      renderPlayerTable();
+    }
+
+    function calculateSkillScores(players) {
+      if (players.length === 0) return;
+
+      // FIXED: Using object property string keys directly instead of anonymous functions
+      const normalizeTo100 = (arr, key, lowerIsBetter = false) => {
+        const values = arr.map(p => p[key]);
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+
+        arr.forEach(p => {
+          p.normalized = p.normalized || {};
+          const val = p[key];
+          let score = 50; 
+          
+          if (max !== min) {
+            if (lowerIsBetter) {
+              score = ((max - val) / (max - min)) * 100;
+            } else {
+              score = ((val - min) / (max - min)) * 100;
+            }
+          }
+          p.normalized[key] = score;
+        });
+      };
+
+      // Normalize all metrics using explicit keys
+      normalizeTo100(players, 'skins', false);
+      normalizeTo100(players, 'putt', false);
+      normalizeTo100(players, 'pins', false);
+      normalizeTo100(players, 'winnings', false);
+      normalizeTo100(players, 'scorePoints', false);
+      normalizeTo100(players, 'avg', true);
+      normalizeTo100(players, 'hcp', true);
+      normalizeTo100(players, 'weeklyAvg', true);
+
+      // Fetch dynamic weights from sliders
+      const weights = {
+        skins: parseFloat(document.getElementById('weight-skins').value),
+        putt: parseFloat(document.getElementById('weight-putt').value),
+        pins: parseFloat(document.getElementById('weight-pins').value),
+        winnings: parseFloat(document.getElementById('weight-winnings').value),
+        scorePts: parseFloat(document.getElementById('weight-scorePts').value),
+        avg: parseFloat(document.getElementById('weight-avg').value),
+        hcp: parseFloat(document.getElementById('weight-hcp').value),
+        weeklyAvg: parseFloat(document.getElementById('weight-weekly').value)
+      };
+
+      const totalWeight = Object.values(weights).reduce((a,b) => a+b, 0);
+
+      players.forEach(p => {
+        if (totalWeight === 0) {
+            p.skillScore = 50; // Fallback if all sliders are set to 0
+            return;
+        }
+
+        // Apply weights based on slider values to the corrected normalized keys
+        let weightedSum = (p.normalized['skins'] * weights.skins) +
+                          (p.normalized['putt'] * weights.putt) +
+                          (p.normalized['pins'] * weights.pins) +
+                          (p.normalized['winnings'] * weights.winnings) +
+                          (p.normalized['scorePoints'] * weights.scorePts) +
+                          (p.normalized['avg'] * weights.avg) +
+                          (p.normalized['hcp'] * weights.hcp) +
+                          (p.normalized['weeklyAvg'] * weights.weeklyAvg);
+
+        p.skillScore = Math.round((weightedSum / totalWeight));
+      });
+
+      players.sort((a,b) => b.skillScore - a.skillScore);
+    }
+
+    function renderPlayerTable() {
+      const tbody = document.getElementById('playerTableBody');
+      tbody.innerHTML = playersData.map((p, idx) => `
+        <tr class="hover:bg-slate-700/30">
+          <td class="p-2">
+            <input type="checkbox" ${p.active ? 'checked' : ''} onchange="playersData[${idx}].active = this.checked" class="rounded accent-emerald-500 cursor-pointer"/>
+          </td>
+          <td class="p-2 font-medium text-slate-200">${p.name}</td>
+          <td class="p-2"><span class="bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded font-bold">${p.skillScore}</span></td>
+          <td class="p-2 font-semibold text-emerald-300">${p.scorePoints}</td>
+          <td class="p-2">${p.avg}</td>
+          <td class="p-2">${p.hcp}</td>
+          <td class="p-2">${p.skins}</td>
+          <td class="p-2">$${p.winnings}</td>
+        </tr>
+      `).join('');
+    }
+
+    function toggleAll(status) {
+      playersData.forEach(p => p.active = status);
+      renderPlayerTable();
+    }
+
+    function generateTeams() {
+      const activePlayers = playersData.filter(p => p.active);
+      const teamSize = parseInt(document.getElementById('teamSize').value);
+
+      if (activePlayers.length < teamSize) {
+        return alert(`You need at least ${teamSize} active players.`);
+      }
+
+      let bestTeams = null;
+      let lowestPenalty = Infinity;
+
+      for (let i = 0; i < 10000; i++) {
+        const shuffled = [...activePlayers].sort(() => Math.random() - 0.5);
+        const teams = [];
+        
+        while (shuffled.length > 0) {
+          if (shuffled.length === teamSize + 1 && teamSize === 2) {
+            teams.push(shuffled.splice(0, 3));
+          } else {
+            teams.push(shuffled.splice(0, teamSize));
+          }
+        }
+
+        const teamAverages = teams.map(t => t.reduce((s, p) => s + p.skillScore, 0) / t.length);
+        const meanAvg = teamAverages.reduce((a,b) => a+b, 0) / teamAverages.length;
+        const variance = teamAverages.reduce((s, a) => s + Math.pow(a - meanAvg, 2), 0) / teamAverages.length;
+
+        let historyPenalty = 0;
+        teams.forEach(team => {
+          for (let a = 0; a < team.length; a++) {
+            for (let b = a + 1; b < team.length; b++) {
+              historyPenalty += getPairingPenalty(team[a].name, team[b].name);
+            }
+          }
+        });
+
+        const totalCost = variance + historyPenalty;
+        if (totalCost < lowestPenalty) {
+          lowestPenalty = totalCost;
+          bestTeams = teams;
+        }
+      }
+
+      renderTeams(bestTeams);
+    }
+
+    function getPairingPenalty(playerA, playerB) {
+      if (!matchupHistory.length) return 0;
+      
+      const lastWeek = Math.max(...matchupHistory.map(m => m["Week Number"] || 0));
+      let penalty = 0;
+
+      matchupHistory.forEach(entry => {
+        const isPair = (entry["Player A"] === playerA && entry["Player B"] === playerB) ||
+                       (entry["Player A"] === playerB && entry["Player B"] === playerA);
+        if (isPair) {
+          if (entry["Week Number"] === lastWeek) {
+            penalty += 10000;
+          } else {
+            penalty += 100;
+          }
+        }
+      });
+      return penalty;
+    }
+
+    function renderTeams(teams) {
+      const container = document.getElementById('teamsContainer');
+      container.innerHTML = teams.map((team, idx) => {
+        const teamSkillAvg = Math.round(team.reduce((s, p) => s + p.skillScore, 0) / team.length);
+        return `
+          <div class="bg-slate-900/60 p-4 rounded-lg border border-slate-700/80 space-y-2">
+            <div class="flex justify-between items-center text-xs text-slate-400 border-b border-slate-800 pb-2">
+              <span class="font-bold text-emerald-400">Team ${idx + 1}</span>
+              <span>Avg Skill: <strong class="text-white">${teamSkillAvg}</strong></span>
+            </div>
+            <ul class="space-y-1">
+              ${team.map(p => `
+                <li class="flex justify-between items-center text-xs">
+                  <span class="text-slate-200">${p.name}</span>
+                  <span class="text-slate-500">Skill: ${p.skillScore} | HCP: ${p.hcp}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `;
+      }).join('');
+
+      let text = `⛳ BOGEYS & BREWS MATCHUPS ⛳\n\n`;
+      teams.forEach((team, idx) => {
+        const names = team.map(p => p.name).join(' & ');
+        text += `Team ${idx + 1}: ${names}\n`;
+      });
+
+      document.getElementById('shareableText').value = text;
+      document.getElementById('shareCardSection').classList.remove('hidden');
+    }
+
+    function copyShareableText() {
+      const textarea = document.getElementById('shareableText');
+      textarea.select();
+      textarea.setSelectionRange(0, 99999);
+
+      navigator.clipboard.writeText(textarea.value).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.innerText = "Copied!";
+        btn.classList.replace('bg-emerald-700', 'bg-blue-600');
+        setTimeout(() => {
+          btn.innerText = "Copy Matchups";
+          btn.classList.replace('bg-blue-600', 'bg-emerald-700');
+        }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
